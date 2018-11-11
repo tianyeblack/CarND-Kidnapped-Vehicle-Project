@@ -177,7 +177,7 @@ int main()
     std::cout << "Disconnected" << std::endl;
   });
 
-  int port = 3000;
+  int port = 4567;
   if (h.listen(port))
   {
     std::cout << "Listening to port " << port << std::endl;
