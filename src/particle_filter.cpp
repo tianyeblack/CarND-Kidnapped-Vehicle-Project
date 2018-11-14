@@ -26,7 +26,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   // Add random Gaussian noise to each particle.
   // NOTE: Consult particle_filter.h for more information about this method (and others in this file).
   if (!is_initialized) {
-    num_particles = 10;
+    num_particles = 100;
     vector<double> ones(num_particles, 1.0);
     weights = ones;
     default_random_engine gen;
@@ -50,16 +50,25 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
   // NOTE: When adding noise you may find std::normal_distribution and std::default_random_engine useful.
   //  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
   //  http://www.cplusplus.com/reference/random/default_random_engine/
+  default_random_engine gen;
   for (int i = 0; i < num_particles; i++) {
     Particle p = particles[i];
     double x = p.x;
     double y = p.y;
     double theta = p.theta;
     double turned_angle = yaw_rate * delta_t;
-    x += velocity / yaw_rate * (sin(theta + turned_angle) - sin(theta));
-    y += velocity / yaw_rate * (cos(theta) - cos(theta + turned_angle));
+    if (yaw_rate != 0) {
+      x += velocity / yaw_rate * (sin(theta + turned_angle) - sin(theta));
+      y += velocity / yaw_rate * (cos(theta) - cos(theta + turned_angle));
+    } else {
+      x += velocity * delta_t * cos(theta);
+      y += velocity * delta_t * sin(theta);
+    }
     theta += turned_angle;
-    default_random_engine gen;
+//    theta = fmod(theta, 2 * M_PI);
+//    if (theta > M_PI) {
+//      theta = 2 * M_PI - theta;
+//    }
     normal_distribution<double> dist_x(x, std_pos[0]);
     normal_distribution<double> dist_y(y, std_pos[1]);
     normal_distribution<double> dist_theta(theta, std_pos[2]);
@@ -125,12 +134,24 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   for_each(particles.begin(), particles.end(), [&total_weight](Particle p) { total_weight += p.weight; });
   cout << total_weight << endl;
   for_each(particles.begin(), particles.end(), [total_weight](Particle &p) { p.weight /= total_weight; });
+  for (int i = 0; i < num_particles; i++) {
+    // TODO: Figure out why this doesn't work/it doesn't consistently work
+//    particles[i].weight /= total_weight;
+    weights[i] = particles[i].weight;
+  }
 }
 
 void ParticleFilter::resample() {
   // TODO: Resample particles with replacement with probability proportional to their weight.
   // NOTE: You may find std::discrete_distribution helpful here.
   //   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
+  random_device rd;
+  mt19937 gen(rd());
+  discrete_distribution<> d(weights.begin(), weights.end());
+  vector<Particle> existingPs = particles;
+  for (int i = 0; i <= num_particles; i++) {
+    particles[i] = existingPs[d(gen)];
+  }
 }
 
 Particle ParticleFilter::SetAssociations(Particle &particle, const std::vector<int> &associations,
